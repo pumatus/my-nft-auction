@@ -5,12 +5,13 @@ pragma solidity ^0.8.28;
 import {Initializable} from "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
 import {UUPSUpgradeable} from "@openzeppelin/contracts-upgradeable/proxy/utils/UUPSUpgradeable.sol";
 import {OwnableUpgradeable} from "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
+import {ReentrancyGuard} from "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
 import {IERC721} from "@openzeppelin/contracts/token/ERC721/IERC721.sol";
 // chainlink预言机
 import {AggregatorV3Interface} from "@chainlink/contracts/src/v0.8/shared/interfaces/AggregatorV3Interface.sol";
 
 // 使用UUPS 代理模式，集成预言机
-contract NFTAuctionMarket is Initializable, UUPSUpgradeable, OwnableUpgradeable {
+contract NFTAuctionMarket is Initializable, UUPSUpgradeable, OwnableUpgradeable, ReentrancyGuard {
     struct Auction {
         // 拍卖结构体
         address seller; // 卖家地址
@@ -62,19 +63,25 @@ contract NFTAuctionMarket is Initializable, UUPSUpgradeable, OwnableUpgradeable 
     }
 
     // 给相关ID的nft 出价。关键字 payable 可支付
-    function placeBid(uint256 _tokenId) external payable {
+    function placeBid(uint256 _tokenId) external payable nonReentrant {
         Auction storage auction = auctions[_tokenId];
-        // 判断价格是否高于最低起拍价
+        address pBidder = auction.highestBidder;
+        uint256 pBid = auction.highestBid;
+
+        // 判断价格是否高于最低起拍价 C
         require(auction.active, "Auction not active");
-        require(msg.value > auction.minPriceEth && msg.value > auction.highestBid, "Bid to low");
+        require(msg.value > auction.minPriceEth && msg.value > pBid, "Bid to low");
 
-        // 退还前一个最高出价者的资金
-        if (auction.highestBidder != address(0)) {
-            payable(auction.highestBidder).transfer(auction.highestBid);
-        }
-
+        // E
         auction.highestBidder = msg.sender;
         auction.highestBid = msg.value;
+
+        // 退还前一个最高出价者的资金 I
+        if (pBidder != address(0)) {
+            // payable(auction.highestBidder).transfer(auction.highestBid);
+            (bool success,) = pBidder.call{value: pBid}("");
+            require(success, "refund");
+        }
         emit BidPlaced(_tokenId, msg.sender, msg.value); // 发送拍卖事件
     }
 
@@ -85,15 +92,17 @@ contract NFTAuctionMarket is Initializable, UUPSUpgradeable, OwnableUpgradeable 
         return (auctions[_tokenId].highestBid * ethPrice); // 1e18
     }
 
-    // 结束拍卖并结算资金
-    function settleAuction(uint256 _tokenId) external {
+    // 结束拍卖并结算资金 防止重入攻击 nonReentrant内部实现重入锁机制
+    function settleAuction(uint256 _tokenId) external nonReentrant {
         Auction storage auction = auctions[_tokenId];
         require(auction.active, "Already settled");
         require(auction.highestBidder != address(0), "No winner!");
 
         auction.active = false;
         // 支付余款到卖家
-        payable(auction.seller).transfer(auction.highestBid);
+        // payable(auction.seller).transfer(auction.highestBid);
+        (bool sellerSuccess,) = auction.seller.call{value: auction.highestBid}("");
+        require(sellerSuccess, "failed");
 
         // 转移NFT 给 获胜者.
         nftConntract.safeTransferFrom(address(this), auction.highestBidder, _tokenId);
