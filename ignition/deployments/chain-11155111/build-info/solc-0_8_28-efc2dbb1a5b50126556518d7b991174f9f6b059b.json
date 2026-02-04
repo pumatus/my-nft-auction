@@ -1,0 +1,39 @@
+{
+  "_format": "hh3-sol-build-info-1",
+  "id": "solc-0_8_28-efc2dbb1a5b50126556518d7b991174f9f6b059b",
+  "solcVersion": "0.8.28",
+  "solcLongVersion": "0.8.28+commit.7893614a",
+  "userSourceNameMap": {
+    "contracts/UUPSProxyDelegatecallV2.sol": "project/contracts/UUPSProxyDelegatecallV2.sol"
+  },
+  "input": {
+    "language": "Solidity",
+    "settings": {
+      "evmVersion": "cancun",
+      "optimizer": {
+        "enabled": true,
+        "runs": 200
+      },
+      "outputSelection": {
+        "*": {
+          "": [
+            "ast"
+          ],
+          "*": [
+            "abi",
+            "evm.bytecode",
+            "evm.deployedBytecode",
+            "evm.methodIdentifiers",
+            "metadata"
+          ]
+        }
+      },
+      "remappings": []
+    },
+    "sources": {
+      "project/contracts/UUPSProxyDelegatecallV2.sol": {
+        "content": "// SPDX-License-Identifier: MIT\npragma solidity ^0.8.28;\n\ncontract UUPSProxyDelegatecallV2 {\n    // 存储impl 地址\n    address public impl;\n    address public deployer;\n\n    constructor(address _impl, bytes memory _initData) {\n        impl = _impl;\n        deployer = msg.sender;\n\n        if (_initData.length > 0) {\n            (bool success,) = _impl.delegatecall(_initData);\n            require(success, \"init failed\");\n        }\n    }\n\n    modifier onDeployer() {\n        require(msg.sender == deployer, \"only deployer\");\n        _;\n    }\n\n    function upgradeTo(address newImpl) external onDeployer {\n        impl = newImpl;\n    }\n\n    receive() external payable {\n        _delegatecall();\n    }\n\n    fallback() external payable {\n        _delegatecall();\n    }\n\n    function _delegatecall() internal {\n        address _impl = impl;\n        require(_impl != address(0), \"impl need set\");\n\n        (bool success, bytes memory data) = _impl.delegatecall(msg.data);\n        // require(success, \"Delegatecall failed\");\n        if (!success) {\n            // 还原错误信息\n            if (data.length > 0) {\n                assembly {\n                    revert(add(data, 32), mload(data))\n                }\n            } else {\n                revert(\"Delegatecall failed\");\n            }\n        } else {\n            // 返回 delegatecall 的返回值. 比如余额\n            assembly {\n                return(add(data, 32), mload(data))\n            }\n        }\n    }\n}\n"
+      }
+    }
+  }
+}

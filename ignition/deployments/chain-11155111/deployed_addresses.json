@@ -1,0 +1,10 @@
+{
+  "CounterModule#Counter": "0xe09d7Ce1107Dc37C9c20d8019DD1786Ca82F6640",
+  "MyNFTModule#MyNFT": "0x65e3407ac8d124e8838E7346954048F36B4C0BA3",
+  "NFTAuctionMarketModule#NFTAuctionMarket": "0xb44D550faC843d6b0c01b5d1720137069BFc41C0",
+  "NFTAuctionMarketModule#UUPSProxy": "0x3F052773b76C653CEc69e95d72c3fa82D2e3D2D1",
+  "NFTAuctionMarketNewModule#NFTAuctionMarketNew": "0x14a8BA058Cf701e1f3AB1acE6Ecc7a3cD693A5EE",
+  "NFTAuctionMarketNewModule#UUPSProxyDelegatecall": "0x48Ca6d0Ad7Be03E70b175bb44E91a95F3b7acd7A",
+  "NFTAuctionMarketNewModule#NFTAuctionMarketNewV2": "0xFED6Fa10485919F60a544F02f5e82220403c8345",
+  "NFTAuctionMarketNewModule#UUPSProxyDelegatecallV2": "0x4C1676F8d8fE31f7Bde643c40B736B9A6cE76ac7"
+}

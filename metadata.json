@@ -1,0 +1,8 @@
+{
+  "name": "Sepolia NFT #1",
+  "description": "这是我在测试网上拍卖的第一个 NFT",
+  "image": "ipfs://bafybeiffdskk6phm3doxyonpc4olyyjnt3ymqapqejo6b3ahuikpamybqa",
+  "attributes": [
+    { "trait_type": "Background", "value": "Blue" }
+  ]
+}
