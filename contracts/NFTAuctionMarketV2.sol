@@ -1,13 +1,12 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.28;
 
+import "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
 import {IERC721} from "@openzeppelin/contracts/token/ERC721/IERC721.sol";
 import {AggregatorV3Interface} from "@chainlink/contracts/src/v0.8/shared/interfaces/AggregatorV3Interface.sol";
 
-contract NFTAuctionMarketNew {
-    // --- 必须手动对齐代理合约的存储结构 ---
-    address public _proxyImpl; // 占用 Slot 0 (对应 Proxy 的 impl)
-    address public _proxyDeployer; // 占用 Slot 1 (对应 Proxy 的 deployer)
+contract NFTAuctionMarketV2 is Initializable {
+    address public owner;
 
     struct Auction {
         address seller;
@@ -21,9 +20,6 @@ contract NFTAuctionMarketNew {
     mapping(uint256 => Auction) public auctions;
     IERC721 public nftConntract;
     AggregatorV3Interface internal ethUsdFeed;
-
-    address public owner;
-    bool private initialized;
 
     event AuctionCreated(uint256 indexed tokenId, uint256 minPriceEth);
     event BidPlaced(uint256 indexed tokenId, address bidder, uint256 amount);
@@ -43,22 +39,20 @@ contract NFTAuctionMarketNew {
         _status = 2;
     }
 
-    // 添加升级函数 只能管理员调用
-    function upgradeTo(address newImpl) external onlyOwner {
-        _proxyImpl = newImpl;
+    constructor() {
+        _disableInitializers();
     }
 
-    function initialize(address _nftAddress, address _priceFeedAddress) public {
-        require(!initialized, "Already initialized");
-        initialized = true;
-        owner = msg.sender;
+    function initialize(address _owner, address _nftAddress, address _priceFeedAddress) external initializer {
+        require(_owner != address(0), "invalid");
+        owner = _owner;
         _status = 2; // 初始化重入锁状态
 
         nftConntract = IERC721(_nftAddress);
         ethUsdFeed = AggregatorV3Interface(_priceFeedAddress);
     }
 
-    function createAuction(uint256 _tokenId, uint256 _minPriceEth) external {
+    function createAuction(uint256 _tokenId, uint256 _minPriceEth) external onlyOwner {
         nftConntract.transferFrom(msg.sender, address(this), _tokenId);
 
         auctions[_tokenId] = Auction({
@@ -90,10 +84,21 @@ contract NFTAuctionMarketNew {
         emit BidPlaced(_tokenId, msg.sender, msg.value);
     }
 
-    function getHighestBidInUsd(uint256 _tokenId) public view returns (uint256) {
+    function getHighestBidInUsd(uint256 _tokenId) public view returns (uint256 usdAmount, uint256 fee) {
         (, int256 price,,,) = ethUsdFeed.latestRoundData();
+
         uint256 ethPrice = uint256(price * 1e10);
-        return (auctions[_tokenId].highestBid * ethPrice) / 1e18; // 建议除以 1e18 得到正常单位
+
+        usdAmount = (auctions[_tokenId].highestBid * ethPrice) / 1e18;
+
+        // 动态手续费
+        if (usdAmount < 1000 ether) {
+            fee = auctions[_tokenId].highestBid * 3 / 100;
+        } else if (usdAmount < 5000 ether) {
+            fee = auctions[_tokenId].highestBid * 2 / 100;
+        } else {
+            fee = auctions[_tokenId].highestBid * 1 / 100;
+        }
     }
 
     function settleAuction(uint256 _tokenId) external nonReentrant {
